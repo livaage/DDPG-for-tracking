@@ -1,0 +1,6 @@
+input_dir: ~/gnnfiles/data/ntuple_PU200_numEvent1000/ntuple_PU200_event0.h5
+
+num_states: 3
+num_actions: 1 
+upper_bound: 25.4 
+lower_bound: -25.4 

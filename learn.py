@@ -14,12 +14,11 @@ globals.initialise_globals()
 std_dev = 0.2
 ou_noise = OUActionNoise(mean=np.zeros(1), std_deviation=float(std_dev) * np.ones(1))
 
-total_episodes = 100
 # Discount factor for future rewards
 # Used to update target networks
-tau = 0.005
+tau = 0.001
 
-buffer = Buffer(50000, 64)
+buffer = Buffer(10, 64)
 
 # To store reward history of each episode
 ep_reward_list = []
@@ -42,10 +41,7 @@ for ep in range(total_episodes):
         tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
         action = policy(tf_prev_state, ou_noise)
-        #print(action[0])
-        # Recieve state and reward from environment.
-        #env.step(0.1)
-        #state, reward, done, info = env.step(action[0])
+
         state, reward, done = env.step(action[0])
         
         buffer.record((prev_state, action, reward, state))

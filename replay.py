@@ -9,14 +9,14 @@ with open("config.yaml", "r") as f:
 
 num_states = config['num_states']
 num_actions = config['num_actions']
-upper_bound = config['upper_bound']
-lower_bound = config['lower_bound']
+upper_bound = config['upper_bound_r']
+lower_bound = config['lower_bound_r']
 
 
 
 
 class Buffer:
-    def __init__(self, buffer_capacity=100000, batch_size=64):
+    def __init__(self, buffer_capacity=100, batch_size=64):
         # Number of "experiences" to store at max
         self.buffer_capacity = buffer_capacity
         # Num of tuples to train on.
@@ -24,22 +24,24 @@ class Buffer:
 
         # Its tells us num of times record() was called.
         self.buffer_counter = 0
-
         # Instead of list of tuples as the exp.replay concept go
         # We use different np.arrays for each tuple element
         self.state_buffer = np.zeros((self.buffer_capacity, num_states))
         self.action_buffer = np.zeros((self.buffer_capacity, num_actions))
         self.reward_buffer = np.zeros((self.buffer_capacity, 1))
         self.next_state_buffer = np.zeros((self.buffer_capacity, num_states))
+        
 
     # Takes (s,a,r,s') obervation tuple as input
     def record(self, obs_tuple):
         # Set index to zero if buffer_capacity is exceeded,
         # replacing old records
         index = self.buffer_counter % self.buffer_capacity
+       # print("obs tuple", obs_tuple)
+       # print("obs tuple", obs_tuple[3])
 
         self.state_buffer[index] = obs_tuple[0]
-        self.action_buffer[index] = obs_tuple[1]
+        self.action_buffer[index] = obs_tuple[1][0]
         self.reward_buffer[index] = obs_tuple[2]
         self.next_state_buffer[index] = obs_tuple[3]
 

@@ -1,5 +1,6 @@
-input_dir: ~/gnnfiles/data/ntuple_PU200_numEvent1000/ntuple_PU200_event0.h5
-
+input_dir: ~/gnnfiles/data/ntuple_PU200_numEvent1000/
+file_name: ntuple_PU200_event
+file_extension: .h5
 num_states: 4
 num_actions: 2 
 upper_bound_r: 26

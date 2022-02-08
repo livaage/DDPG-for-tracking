@@ -11,14 +11,13 @@ import globals
 
 globals.initialise_globals() 
 
-std_dev = 0.2
-ou_noise = OUActionNoise(mean=np.zeros(1), std_deviation=float(std_dev) * np.ones(1))
-
+std_dev = 3
+ou_noise = OUActionNoise(mean=np.zeros(2), std_deviation=float(std_dev) * np.ones(2))
 # Discount factor for future rewards
 # Used to update target networks
-tau = 0.001
+tau = 0.8
 
-buffer = Buffer(10, 64)
+buffer = Buffer(100, 1024)
 
 # To store reward history of each episode
 ep_reward_list = []

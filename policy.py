@@ -15,8 +15,10 @@ def policy(state, noise_object):
     sampled_actions = tf.squeeze(globals.actor_model(state))
     noise = noise_object()
     # Adding noise to action
+    #print("sample 1", sampled_actions)
     sampled_actions = sampled_actions.numpy() + noise
-
+    #print("sample2", sampled_actions)
+    #print()
     # We make sure action is within bounds
     legal_action = np.clip(sampled_actions, lower_bound, upper_bound)
 

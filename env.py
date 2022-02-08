@@ -7,7 +7,6 @@ with open("config.yaml", "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
 
-event = pd.read_hdf(config['input_dir'])
 
 
 class TrackEnv(): 
@@ -39,7 +38,12 @@ class TrackEnv():
     
     
     def __init__(self): 
-        self.placeholder = 0 
+        self.file_number = 0 
+        self.initial_event = pd.read_hdf(config['input_dir']+config['file_name']+str(self.file_number)+config['file_extension'])
+        
+        df = self.initial_event[self.initial_event['sim_pt'] > 2]
+        self.event = df
+        #self.event = pt_cut
         self.episode_counter = 0 
         self.record_partilce_ids = [] 
         self.record_r = [] 
@@ -49,8 +53,8 @@ class TrackEnv():
         self.record_new_r = []
         self.record_new_z = [] 
         self.previous_state = []
-
-        self.write = 0 
+        self.reset_count = 0 
+        self.write = 2 
     #completes one step based on the input action value 
     def step(self, a): 
        
@@ -83,34 +87,56 @@ class TrackEnv():
         np.savetxt('dzs.csv', self.record_dz, delimiter=',')
         np.savetxt('new_r.csv', self.record_new_r, delimiter=',')
         np.savetxt('new_z.csv', self.record_new_z, delimiter=',')
+
            # self.write = 1 
+        #self.event = self.event[self.event['sim_pt']>2]
 
-
+    #ensuring the new hit picked can't be the same as the hit under consideration 
+        other_hits = self.event[self.event['hit_id']!= self.state.hit_id]
         #find hits in the new x region (update to y and z)
-        # this makes it faster to search for closest hit later on 
-        compatible_hits = event[(event['r'] > (new_r - 0.1)) & (event['r'] < (new_r + 0.1)) & (event['z'] > (new_z - 1)) & (event['z'] < (new_z + 1))]
-        
-        #ensuring the new hit picked can't be the same as the hit under consideration 
-        compatible_hits = compatible_hits[compatible_hits['hit_id']!= self.state.hit_id]
 
-        contains_same_track = len(compatible_hits[compatible_hits['particle_id']==self.state.particle_id]) > 0 
+        # this makes it faster to search for closest hit later on 
+        compatible_hits = other_hits[(other_hits['r'] > (new_r -3)) & (other_hits['r'] < (new_r +3)) & (other_hits['z'] > (new_z - 5)) & (other_hits['z'] < (new_z + 5))]
+        same_particle = compatible_hits[compatible_hits['particle_id']==self.original_pid]
+        contains_same_track = len(same_particle) > 0 
+        
         if contains_same_track: 
-            reward = 10
+            distances = [] 
+            #it's a big search, converting to list from pandas save an order of magnitude in time 
+            rlist = same_particle.r.tolist()
+            zlist = same_particle.z.tolist() 
+            for ix in range(len(same_particle)): 
+                row = same_particle.iloc[ix, ]
+                distance = np.abs(new_r - rlist[ix]) + np.abs(new_z-zlist[ix])
+                distances.append(distance)
+            # the reward is 1/lenght of distance between projected place and the closest hit for that particle 
+            reward = 1/min(distances)
+            #reward = 1 
         else: 
             reward = -1
         
         if len(compatible_hits) == 0: 
-            print("no compatibles")
-            return  np.array([self.state.r, self.state.z, self.previous_state.r, self.previous_state.z]), -1, True
+            
+            #return  np.array([self.state.r, self.state.z, self.previous_state.r, self.previous_state.z]), -1, True
+            compatible_hits =  other_hits[(other_hits['r'] > (new_r - 10)) & (other_hits['r'] < (new_r + 10)) & (other_hits['z'] > (new_z - 100)) & (other_hits['z'] < (new_z + 100))]
+            print("using full hits")
         # update the track to the hit with the closest r state 
         #closest_r_hit_idx = np.argmin(np.abs(compatible_hits.r - new_r))
         distances = [] 
+        #it's a big search, converting to list from pandas save an order of magnitude in time 
+        rlist = compatible_hits.r.tolist()
+        zlist = compatible_hits.z.tolist() 
         for ix in range(len(compatible_hits)): 
             row = compatible_hits.iloc[ix, ]
-            distance = np.abs(new_r - row.r) + np.abs(new_z-row.z)
+            distance = np.abs(new_r - rlist[ix]) + np.abs(new_z-zlist[ix])
             distances.append(distance)
         new_hit = compatible_hits.iloc[np.argmin(distances), ]
-
+      #  if new_hit.particle_id == self.original_pid: 
+      #      reward =1
+      #  else: 
+      #      reward = -1 
+        
+ 
 
       #  if new_hit.particle_id == self.state.particle_id: 
       #      reward = 1 
@@ -123,7 +149,7 @@ class TrackEnv():
         self.state = new_hit 
         self.num_track_hits += 1 
 
-        if self.num_track_hits > 3:
+        if self.num_track_hits > 4:
             done = True
         else: 
             done = False 
@@ -138,11 +164,25 @@ class TrackEnv():
         
     def reset(self): 
         # start at random hit, but could start arbitrarly 
-        random_hit_id = random.choice(event.hit_id)
-        random_hit = event[event['hit_id']==random_hit_id]
+        #print("lenght event", len(self.event))
+        #print("hit id", self.event.hit_id.values)
+        random_hit_id = random.choice(self.event.hit_id.values)
+        #print("hte hit id is ", random_hit_id)
+        random_hit = self.event[self.event['hit_id']==random_hit_id]
+        self.original_pid = random_hit.particle_id.values[0]
+        np.savetxt('original_pid.csv', [self.original_pid], delimiter=',')
+
         #this turns it into a series instead of a df 
         self.state = random_hit.squeeze(axis=0)
         self.last_dr = None 
         self.num_track_hits = 0 
+        self.reset_count += 1 
+        if self.reset_count > 100: 
+            self.file_number += 1 
+            self.initial_event = pd.read_hdf(config['input_dir']+config['file_name']+str(self.file_number)+config['file_extension'])
+            self.event = self.initial_event[self.initial_event['sim_pt'] > 2]
+            self.reset_count = 0 
+            print("jumping to file", self.file_number)
+
         return np.array([self.state.r, self.state.z, 0, 0])
 

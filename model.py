@@ -8,9 +8,9 @@ with open("config.yaml", "r") as f:
 num_states = config['num_states']
 num_actions = config['num_actions']
 #
-upper_bound = config['upper_bound_r']
+upper_bound = config['upper_bound']
 #upper_bound = config['upper_bound']
-lower_bound = config['lower_bound_r']
+lower_bound = config['lower_bound']
 
 def get_actor():
     # Initialize weights between -3e-3 and 3-e3
@@ -23,7 +23,8 @@ def get_actor():
 
 
 
-    outputs = layers.Dense(1, activation="tanh", kernel_initializer=last_init)(out)
+
+    outputs = layers.Dense(2, activation="tanh", kernel_initializer=last_init)(out)
 
     # Our upper bound is 2.0 for Pendulum.
     outputs = outputs * upper_bound
@@ -33,7 +34,7 @@ def get_actor():
 
 def get_critic():
     # State as input
-    first_init = tf.random_uniform_initializer(minval=-1000, maxval=0)
+    first_init = tf.random_uniform_initializer(minval=-0.003, maxval=0.003)
 
     state_input = layers.Input(shape=(num_states))
     state_out = layers.Dense(32, activation="relu")(state_input)

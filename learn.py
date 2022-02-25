@@ -27,7 +27,7 @@ buffer = Buffer(100, 64)
 ep_reward_list = []
 # To store average reward history of last few episodes
 avg_reward_list = []
-total_episodes = 100000
+total_episodes = 20000
 # Takes about 4 min to train
 
 env = TrackEnv()
@@ -43,7 +43,7 @@ for ep in range(total_episodes):
 
         tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
-        action = policy(tf_prev_state, ou_noise1)
+        action = policy(tf_prev_state, ou_noise1, ou_noise2)
 
         state, reward, done = env.step(action[0])
         

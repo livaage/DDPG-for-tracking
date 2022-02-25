@@ -9,8 +9,8 @@ with open("config.yaml", "r") as f:
 
 num_states = config['num_states']
 num_actions = config['num_actions']
-upper_bound = config['upper_bound_r']
-lower_bound = config['lower_bound_r']
+upper_bound = config['upper_bound']
+lower_bound = config['lower_bound']
 
 
 
@@ -41,8 +41,8 @@ class Buffer:
        # print("obs tuple", obs_tuple[3])
 
         self.state_buffer[index] = obs_tuple[0]
-        #self.action_buffer[index] = obs_tuple[1][0]
-        self.action_buffer[index] = obs_tuple[1]
+        self.action_buffer[index] = obs_tuple[1][0]
+        #self.action_buffer[index] = obs_tuple[1]
         self.reward_buffer[index] = obs_tuple[2]
         self.next_state_buffer[index] = obs_tuple[3]
 

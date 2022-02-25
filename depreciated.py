@@ -72,3 +72,18 @@
         #    distance = np.abs(new_r - rlist[ix]) + np.abs(new_z-zlist[ix])
         #    distances.append(distance)
         #new_hit = compatible_hits.iloc[np.argmin(distances), ]
+
+                #allowed_starts = self.event[self.event['layer_id']==1]
+        #random_hit_id = random.choice(allowed_starts.hit_id.values)
+        #random_hit = self.event[self.event['hit_id']==random_hit_id]
+        
+        #self.original_pid = random_hit.particle_id.values[0]
+        #self.particle = self.event[self.event['particle_id']==self.original_pid].reset_index() 
+
+
+                
+        #next_hit = self.original_particle.loc[self.num_track_hits +1,: ]
+
+        #distance_next_hit = np.sqrt((new_r-next_hit.r)**2 + (new_z - next_hit.z)**2)
+        #distance_next_hit = np.abs(new_r-next_hit.r)
+        #print(distance_next_hit)

@@ -48,6 +48,8 @@ class TrackEnv():
         self.record_dz = []
         self.record_new_r = []
         self.record_new_z = [] 
+        self.record_next_hit_r = []
+        self.record_next_hit_z = [] 
         self.previous_state = []
         self.record_original_pid = [] 
         self.reset_count = 0 
@@ -55,51 +57,38 @@ class TrackEnv():
     #completes one step based on the input action value 
     def step(self, a): 
        
-        #dr = a[0]
-        #dz = a[1]
+        dr = a[0]
+        dz = a[1]
         
-        new_r = self.state.r + a 
+        new_r = self.state.r + dr
         #checking that the new x is within the x limits
         
+        #this should be superflous 
         new_r = np.clip(new_r, 0, 26)
 
-        #new_z = a[1]
-        #new_z = self.state.z + dz 
-        #new_z = np.clip(new_z, -265, 265)
-
-# stores and writes result to file         
-        if (self.episode_counter > 2800) & (self.episode_counter < 2850): 
-            #print("episode counter", self.episode_counter)
-            self.record_partilce_ids.append(self.state.particle_id)
-            self.record_r.append(self.state.r)
-            #self.record_dr.append(dr)
-            #self.record_z.append(self.state.z)
-            #self.record_dz.append(dz)
-            self.record_new_r.append(new_r)
-            #self.record_new_z.append(new_z)
-            self.record_original_pid.append(self.original_pid)
-
-    
-        if (self.episode_counter == 3000) & (self.write==2): 
-            np.savetxt('pids.csv', self.record_partilce_ids, delimiter=',')
-            np.savetxt('rs.csv', self.record_r, delimiter=',')
-            #np.savetxt('drs.csv', self.record_dr, delimiter=',')
-            np.savetxt('zs.csv', self.record_z, delimiter=',')
-            #np.savetxt('dzs.csv', self.record_dz, delimiter=',')
-            np.savetxt('new_r.csv', self.record_new_r, delimiter=',')
-            #np.savetxt('new_z.csv', self.record_new_z, delimiter=',')
-            np.savetxt('original_pid.csv', self.record_original_pid, delimiter=',')
+        new_z = self.state.z + dz 
+        new_z = np.clip(new_z, -265, 265)
+        
+        #particle = particle[particle['hit_id']!=self.state.hit_id]
+        #contains_same_track = len(same_particle) > 0 
+        
+        # find closest hit in the event to the predicted position 
+        # remove the original hit from the df 
+        other_hits = self.event[self.event['hit_id']!=self.state.hit_id]
+        # it's a big search, converting to list from pandas save an order of magnitude in time,a also just search a small part of the df 
+        rlist = other_hits.r.tolist()
+        zlist = other_hits.z.tolist() 
+        distances = np.sqrt((rlist-new_r)**2+(zlist - new_z)**2) 
+        index = np.argmin(distances)
+        new_hit = other_hits.iloc[index, ] 
 
 
-        #dangerous - relies on an ordered df 
+        # this is dangerous - relies on ordered df! 
         next_hit = self.original_particle.loc[self.num_track_hits +1,: ]
+        #reward given based on how close the hit was 
+        distance = np.sqrt((new_hit.r - next_hit.r)**2 + (new_hit.z - next_hit.z)**2)
+        reward = -distance
 
-        #distance_next_hit = np.sqrt((new_r-next_hit.r)**2 + (new_z - next_hit.z)**2)
-        distance_next_hit = np.abs(new_r-next_hit.r)
-        #print(distance_next_hit)
-        reward = -distance_next_hit
-
-        new_hit = next_hit
         
  
 
@@ -109,7 +98,7 @@ class TrackEnv():
         phi = self.calculate_phi(new_hit.hit_id)
 
         dr = self.state.r - self.previous_state.r 
-        #dz = self.state.z - self.previous_state.z 
+        dz = self.state.z - self.previous_state.z 
 
         if self.num_track_hits > 6:
             done = True 
@@ -118,23 +107,55 @@ class TrackEnv():
             self.episode_counter +=1 
 
 
-        state = np.array([self.state.r, dr, self.state.z])
+
+        state = np.array([self.state.r, dr, self.state.z, dz])
+
+
+        # stores and writes result to file         
+        if (self.episode_counter > 4800) & (self.episode_counter < 4850): 
+            #print("episode counter", self.episode_counter)
+            self.record_partilce_ids.append(self.state.particle_id)
+            self.record_r.append(self.state.r)
+            #self.record_dr.append(dr)
+            self.record_z.append(self.state.z)
+            #self.record_dz.append(dz)
+            self.record_new_r.append(new_r)
+            self.record_new_z.append(new_z)
+
+            self.record_next_hit_r.append(next_hit.r)
+            self.record_next_hit_z.append(next_hit.z)
+
+            #self.record_new_z.append(new_z)
+            self.record_original_pid.append(self.original_pid)
+
+    
+        if (self.episode_counter == 5000) & (self.write==2): 
+            np.savetxt('pids.csv', self.record_partilce_ids, delimiter=',')
+            np.savetxt('rs.csv', self.record_r, delimiter=',')
+            #np.savetxt('drs.csv', self.record_dr, delimiter=',')
+            np.savetxt('zs.csv', self.record_z, delimiter=',')
+            #np.savetxt('dzs.csv', self.record_dz, delimiter=',')
+            np.savetxt('new_r.csv', self.record_new_r, delimiter=',')
+            np.savetxt('new_z.csv', self.record_new_z, delimiter=',')
+            np.savetxt('next_hit_r.csv', self.record_next_hit_r, delimiter=',')
+            np.savetxt('next_hit_z.csv', self.record_next_hit_z, delimiter=',')
+            np.savetxt('original_pid.csv', self.record_original_pid, delimiter=',')
 
         return state, reward, done
         
         
         
     def reset(self): 
-        # start at random hit, but could start arbitrarly 
-        #print("lenght event", len(self.event))
-        #print("hit id", self.event.hit_id.values)
+
         self.initial_event = pd.read_hdf(config['input_dir']+config['file_name']+str(self.file_number)+config['file_extension'])
+        # cut on pt 
         self.event = self.initial_event[self.initial_event['sim_pt'] > 2]
         #subset by the number of hits 
         nh = self.event.groupby('particle_id').agg('count').iloc[:,0]
         # only pick the pids that has a certain number of hits 
         self.event = self.event[self.event['particle_id'].isin(np.array(nh[nh > 7].index))]
 
+        # assume each file has about 100 tracks that has pt > 2 and >7 hits. If reusing tracks, that's fine as well 
         if self.reset_count > 100: 
             self.file_number += 1 
             self.initial_event = pd.read_hdf(config['input_dir']+config['file_name']+str(self.file_number)+config['file_extension'])
@@ -146,25 +167,22 @@ class TrackEnv():
             self.reset_count = 0 
             print("jumping to file", self.file_number)
 
+
         random_particle_id = random.choice(self.event.particle_id.values)
         self.particle = self.event[self.event['particle_id']==random_particle_id]
         self.original_pid = random_particle_id
+        # This relies on an ordered df!  
         start_hit = self.particle.iloc[0:,]
-        #allowed_starts = self.event[self.event['layer_id']==1]
-        #random_hit_id = random.choice(allowed_starts.hit_id.values)
-        #random_hit = self.event[self.event['hit_id']==random_hit_id]
-        
-        #self.original_pid = random_hit.particle_id.values[0]
-        #self.particle = self.event[self.event['particle_id']==self.original_pid].reset_index() 
+
         
         self.index1 = 0
 
-            
+        # start with a seed so one has dr and dz 
         hit2  = self.particle.iloc[self.index1+1,:]
         phi2 = self.calculate_phi(hit2.hit_id)
         #del_phi = self.calculate_phi(random_hit.hit_id.value[0]) - phi2 
         #print(hit2.z)
-       #dz = start_hit.z.values[0] - hit2.z
+        dz = start_hit.z.values[0] - hit2.z
         dr = start_hit.r.values[0] - hit2.r
 
        
@@ -179,7 +197,7 @@ class TrackEnv():
         # 
  
 
-        return np.array([self.state.r, dr, self.state.z])
+        return np.array([self.state.r, dr, self.state.z, dz])
 
     def calculate_phi(self, hit_id): 
         h = self.event[self.event['hit_id']==hit_id]

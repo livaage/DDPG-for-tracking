@@ -7,8 +7,9 @@ with open("config.yaml", "r") as f:
 
 num_states = config['num_states']
 num_actions = config['num_actions']
-#upper_bound = config['upper_bound_r']
-upper_bound = config['upper_bound']
+#
+upper_bound = config['upper_bound_r']
+#upper_bound = config['upper_bound']
 lower_bound = config['lower_bound_r']
 
 def get_actor():
@@ -17,17 +18,23 @@ def get_actor():
 
     inputs = layers.Input(shape=(num_states,))
     out = layers.Dense(256, activation="relu")(inputs)
-    out = layers.Dense(256, activation="relu")(out)
-    outputs = layers.Dense(2, activation="tanh", kernel_initializer=last_init)(out)
+    out = layers.Dense(64, activation="relu")(out)
+
+
+
+
+    outputs = layers.Dense(1, activation="tanh", kernel_initializer=last_init)(out)
 
     # Our upper bound is 2.0 for Pendulum.
-    #outputs = outputs * upper_bound
+    outputs = outputs * upper_bound
     model = tf.keras.Model(inputs, outputs)
     return model
 
 
 def get_critic():
     # State as input
+    first_init = tf.random_uniform_initializer(minval=-1000, maxval=0)
+
     state_input = layers.Input(shape=(num_states))
     state_out = layers.Dense(32, activation="relu")(state_input)
     state_out = layers.Dense(32, activation="relu")(state_out)
@@ -39,9 +46,10 @@ def get_critic():
     # Both are passed through seperate layer before concatenating
     concat = layers.Concatenate()([state_out, action_out])
 
-    out = layers.Dense(256, activation="relu")(concat)
-    out = layers.Dense(256, activation="relu")(out)
-    outputs = layers.Dense(2)(out)
+    out = layers.Dense(32, activation="relu")(concat)
+    out = layers.Dense(32, activation="relu")(out)
+    #out = layers.Rescaling(1/1000)(out)
+    outputs = layers.Dense(1,kernel_initializer=first_init)(out)
 
     # Outputs single value for give state-action
     model = tf.keras.Model([state_input, action_input], outputs)

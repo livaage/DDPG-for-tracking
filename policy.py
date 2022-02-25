@@ -7,19 +7,22 @@ import globals
 with open("config.yaml", "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
-upper_bound = config['upper_bound']
-lower_bound = config['lower_bound']
+upper_bound = config['upper_bound_r']
+lower_bound = config['lower_bound_r']
 
 
-def policy(state, noise_object):
+def policy(state, noise_object1):
     sampled_actions = tf.squeeze(globals.actor_model(state))
-    noise = noise_object()
+    noise1 = noise_object1()
+    #noise2 = noise_object2()
     # Adding noise to action
-    #print("sample 1", sampled_actions)
-    sampled_actions = sampled_actions.numpy() + noise
+    sampled_actions1 = sampled_actions.numpy() + noise1 
+    #sampled_actions1 = sampled_actions.numpy()[0] + noise1 
+    #sampled_actions2 = sampled_actions.numpy()[1] + noise2
+    #sampled_actions = np.array([sampled_actions1, sampled_actions2]).flatten()
     #print("sample2", sampled_actions)
     #print()
     # We make sure action is within bounds
-    legal_action = np.clip(sampled_actions, lower_bound, upper_bound)
+    legal_action = np.clip(sampled_actions1, lower_bound, upper_bound)
 
     return [np.squeeze(legal_action)]

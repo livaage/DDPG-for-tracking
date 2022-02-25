@@ -37,11 +37,12 @@ class Buffer:
         # Set index to zero if buffer_capacity is exceeded,
         # replacing old records
         index = self.buffer_counter % self.buffer_capacity
-       # print("obs tuple", obs_tuple)
+        #print("obs tuple", obs_tuple[1])
        # print("obs tuple", obs_tuple[3])
 
         self.state_buffer[index] = obs_tuple[0]
-        self.action_buffer[index] = obs_tuple[1][0]
+        #self.action_buffer[index] = obs_tuple[1][0]
+        self.action_buffer[index] = obs_tuple[1]
         self.reward_buffer[index] = obs_tuple[2]
         self.next_state_buffer[index] = obs_tuple[3]
 
@@ -80,6 +81,8 @@ class Buffer:
         globals.actor_optimizer.apply_gradients(
             zip(actor_grad, globals.actor_model.trainable_variables)
         )
+
+        #print(critic_grad, actor_grad)
 
     # We compute the loss and update parameters
     def learn(self):

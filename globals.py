@@ -19,5 +19,7 @@ def initialise_globals():
     actor_lr = 0.001
     gamma = 0.99
 
-    critic_optimizer = tf.keras.optimizers.Adam(critic_lr)
+    #clipvalue
+
+    critic_optimizer = tf.keras.optimizers.Adam(critic_lr, amsgrad=True)
     actor_optimizer = tf.keras.optimizers.Adam(actor_lr)

@@ -11,19 +11,23 @@ import globals
 
 globals.initialise_globals() 
 
-std_dev = 3
-ou_noise = OUActionNoise(mean=np.zeros(2), std_deviation=float(std_dev) * np.ones(2))
+std_dev = 5
+ou_noise1 = OUActionNoise(mean=np.array([0]), std_deviation=float(std_dev) * np.ones(1))
+
+std_dev = 20
+ou_noise2 = OUActionNoise(mean=np.array([0]), std_deviation=float(std_dev) * np.ones(1))
+
 # Discount factor for future rewards
 # Used to update target networks
-tau = 0.8
+tau = 0.005
 
-buffer = Buffer(100, 1024)
+buffer = Buffer(100, 64)
 
 # To store reward history of each episode
 ep_reward_list = []
 # To store average reward history of last few episodes
 avg_reward_list = []
-total_episodes = 1000
+total_episodes = 100000
 # Takes about 4 min to train
 
 env = TrackEnv()
@@ -39,7 +43,7 @@ for ep in range(total_episodes):
 
         tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
-        action = policy(tf_prev_state, ou_noise)
+        action = policy(tf_prev_state, ou_noise1)
 
         state, reward, done = env.step(action[0])
         

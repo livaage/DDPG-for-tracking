@@ -1,7 +1,8 @@
 from noise import OUActionNoise 
 from model import get_actor, get_critic
 from replay import Buffer, update_target
-from env import TrackEnv
+from trackml_env import TrackMLEnv
+from trackml_predpos import TrackMLPredposEnv
 from policy import policy 
 import numpy as np 
 import tensorflow as tf 
@@ -11,10 +12,10 @@ import globals
 
 globals.initialise_globals() 
 
-std_dev = 5
+std_dev = 1
 ou_noise1 = OUActionNoise(mean=np.array([0]), std_deviation=float(std_dev) * np.ones(1))
 
-std_dev = 20
+std_dev = 1
 ou_noise2 = OUActionNoise(mean=np.array([0]), std_deviation=float(std_dev) * np.ones(1))
 
 # Discount factor for future rewards
@@ -30,7 +31,7 @@ avg_reward_list = []
 total_episodes = 20000
 # Takes about 4 min to train
 
-env = TrackEnv()
+env = TrackMLPredposEnv()
 for ep in range(total_episodes):
 
     prev_state = env.reset()
@@ -44,7 +45,6 @@ for ep in range(total_episodes):
         tf_prev_state = tf.expand_dims(tf.convert_to_tensor(prev_state), 0)
 
         action = policy(tf_prev_state, ou_noise1, ou_noise2)
-
         state, reward, done = env.step(action[0])
         
         buffer.record((prev_state, action, reward, state))
@@ -63,7 +63,7 @@ for ep in range(total_episodes):
     ep_reward_list.append(episodic_reward)
 
     # Mean of last 40 episodes
-    avg_reward = np.mean(ep_reward_list[-40:])
+    avg_reward = np.mean(ep_reward_list[-5:])
     print("Episode * {} * Avg Reward is ==> {}".format(ep, avg_reward))
     avg_reward_list.append(avg_reward)
 

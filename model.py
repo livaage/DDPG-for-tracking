@@ -1,6 +1,7 @@
 import tensorflow as tf
 from tensorflow.keras import layers
 import yaml
+import pandas as pd
 
 with open("config.yaml", "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
@@ -21,13 +22,11 @@ def get_actor():
     out = layers.Dense(64, activation="relu")(out)
 
 
-
-
-
     outputs = layers.Dense(2, activation="tanh", kernel_initializer=last_init)(out)
 
     # Our upper bound is 2.0 for Pendulum.
     outputs = outputs * upper_bound
+
     model = tf.keras.Model(inputs, outputs)
     return model
 
@@ -50,9 +49,11 @@ def get_critic():
     out = layers.Dense(32, activation="relu")(concat)
     out = layers.Dense(32, activation="relu")(out)
     #out = layers.Rescaling(1/1000)(out)
-    outputs = layers.Dense(1,kernel_initializer=first_init)(out)
-
+    outputs = layers.Dense(2,kernel_initializer=first_init)(out)
+    
     # Outputs single value for give state-action
     model = tf.keras.Model([state_input, action_input], outputs)
 
     return model
+
+

@@ -28,8 +28,8 @@ rf_file['pred_r'] = rf_file['pred_r'].values*scale_r
 p1 = rf_file[rf_file['particle_id']==-18951]
 
 # sample every 100th particle id 
-pids = rf_file.particle_id.values[::60]
-files = rf_file.filenumber.values[::60]
+pids = rf_file.particle_id.values[::600]
+files = rf_file.filenumber.values[::600]
 #print(pids, files, len(pids), len(files))
 window = pyglet.window.Window(window_length, window_height)
 
@@ -104,7 +104,7 @@ class Point:
 
 p = Point() 
 
-clock.schedule_interval(p.plot_point, 0.5)
+clock.schedule_interval(p.plot_point, 0.05)
 frame = 0 
 @window.event
 def on_draw():

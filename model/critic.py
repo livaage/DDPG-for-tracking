@@ -42,7 +42,7 @@ def get_critic():
     action_out = layers.Dense(2048, activation="relu")(action_input) 
     action_out = layers.Dense(512, activation="relu")(action_out)
 
-    action_out = layers.Dense(64, activation="relu")(action_out)
+    action_out = layers.Dense(32, activation="relu")(action_out)
 
 
     #comp_input = layers.Input(shape=(num_actions))
@@ -53,6 +53,7 @@ def get_critic():
     #action_convolution = layers.MaxPooling1D((4))(action_convolution)
     #action_convolution = layers.Conv1D(64, kernel_size=2, activation='relu')(action_convolution)
     #action_convolution = layers.MaxPooling1D((2))(action_convolution)
+
     action_convolution = layers.Flatten()(action_convolution)
     #action_convolution = layers.Reshape((32))(action_convolution)
 #

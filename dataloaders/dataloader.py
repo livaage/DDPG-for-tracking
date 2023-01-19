@@ -72,6 +72,7 @@ class DataLoader:
 
         hits['discrete_module_id'] = [remap_modules_dic[val] for val in mods]
         hits = hits.merge(unique_layer_id_mapping, on=['volume_id', 'layer_id'], how='left')
+        hits = hits.groupby(['particle_id', 'unique_layer_id']).min().reset_index()
 
         #hits = hits.merge(lids, on=['volume_id', 'layer_id'], how='left')
         hits = hits.sort_values(['r', 'z'])
@@ -142,7 +143,9 @@ class DataLoader:
         self.hits = self.hits[self.hits['pt'] > pt_min] 
 
     def _filter_by_num_track_hits(self, min_hits): 
-        c = self.hits.groupby(['particle_id']).count()
+        no_doubles = self.hits.groupby(['particle_id', 'unique_layer_id']).min().reset_index()
+
+        c = no_doubles.groupby(['particle_id']).count()
         self.hits = self.hits[self.hits['particle_id'].isin(c[c['hit_id'] > min_hits].index)]
 
     def _assign_unique_layer_id(self): 
@@ -188,28 +191,28 @@ class DataLoader:
         self._load_file_trackml(file_number)
         #self._load_file_cms(file_number)
         self._remove_bad_double_hits()
-        self._filter_by_num_track_hits(6) 
+        self._filter_by_num_track_hits(8) 
         #self._assign_unique_layer_id() 
         self._get_layer_module_connections()
         self._filter_out_missing_hits()
         #print(self.hits)
-        self._pt_cut(2)
+        #self._pt_cut(2)
 
         self._filterout_na() 
-        #self._pt_cut(2)
+        self._pt_cut(2)
         self._sort() 
         #print(np.unique(self.hits['particle_id']))
 
 
         #return self.all_hits, np.unique(self.hits['particle_id'])
-        #[416, 526, 597, 759, 761, 907]
+        #good_pids = self.hits.particle_id.unique()[2:3]
         #removable_pids = [pid for pid in np.unique(self.all_hits.particle_id) if pid not in np.unique(self.hits.particle_id)]
 
         #pids_to_remove = removable_pids[:round(len(removable_pids)/2)]
         #self.all_hits = self.all_hits[~self.all_hits['particle_id'].isin(pids_to_remove)]
 
         allowed = np.unique(self.hits.particle_id)
-        
+        #self.hits = self.hits[self.hits['particle_id'].isin(good_pids)]
         #test_allowed_pids = allowed[:round(len(allowed)*0.001)]
         test_allowed_pids = allowed[:2]
         #print(len( np.unique(self.hits.particle_id)))

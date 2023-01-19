@@ -25,44 +25,44 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         self.hits = hits 
         self.done = False 
         self.prev_hit_buffer = hits.iloc[0]
-        self.prev_prev_buffer = hits.iloc[0]
+        #self.prev_prev_buffer = hits.iloc[0]
 
     def _find_m_b(self, hit1, hit2):
+        """Slope and intercept of straight line given two hits"""
         m = (hit2.r - hit1.r)/(hit2.z - hit1.z)
         b = hit2.r - m*hit2.z
         return m,b 
 
     def _find_module_compatible_hits(self, hit2, m): 
-        
-        self.hit = hit2 
-        try: 
+        """Find potential next hits that are compatible with the module mapping"""
+                
+        try:
             comp_mod = mappings[str(int(hit2.discrete_module_id))]
-            #comp_mod = mappings_cms[str(int(hit2.discrete_module_id))]
         except: 
-            #print("that comp mod issue ", "hit 2 is", hit2, "mod id hit2", hit2.discrete_module_id)
             comp_mod = np.unique(self.hits.discrete_module_id.values)
-            
-        if m > 0: 
-            compy = self.hits[self.hits['z'] > hit2.z + 0.01] 
-        else: 
-            compy = self.hits[self.hits['z'] < hit2.z - 0.01]
+        # only allow z that's larger either positive or negative than previous z 
+       
+        
+        compz = self.hits[np.sign(m)*self.hits['z'] > np.sign(m)*(hit2.z + 0.01)]
+        #print("len 1", len(compz))
 
-        comp_hits = compy[(compy['discrete_module_id'].isin(comp_mod)) & 
-                    (compy['r'] > (hit2.r +0.1)) & (compy['r'] != self.prev_hit_buffer.r) & (compy['unique_layer_id']!=hit2.unique_layer_id)]# & 
-                    #(np.abs(self.hits['z']) > np.abs(hit2.z))]
-        if hit2.unique_layer_id == self.prev_hit_buffer.unique_layer_id == self.prev_prev_buffer.unique_layer_id: 
-        #if hit2.unique_layer_id == self.prev_hit_buffer.unique_layer_id: 
-            comp_hits = comp_hits[comp_hits['unique_layer_id']!=hit2.unique_layer_id]
+
+        #compz = compz[compz['r'] > self.prev_hit_buffer.r]
+        #print("len 2", len(compz))
+        # ensure it predicts from the nest layer and r is also bigger 
+        comp_hits = compz[((compz['discrete_module_id'].isin(comp_mod)) & 
+                   (compz['r'] > (hit2.r +0.1))  & (compz['unique_layer_id']!=hit2.unique_layer_id))]# & 
+        #print("len 3", len(comp_hits))
 
         if len(comp_hits) == 0: 
             #print("htats right i went here")
             if m > 0: 
-                compy = self.hits[self.hits['z'] > hit2.z] 
+                compz = self.hits[self.hits['z'] > hit2.z] 
             else: 
-                compy = self.hits[self.hits['z'] < hit2.z]
+                compz= self.hits[self.hits['z'] < hit2.z]
             
-            comp_hits = compy[(compy['discrete_module_id'].isin(comp_mod)) & 
-                    (compy['r'] > hit2.r) & (compy['r'] != self.prev_hit_buffer.r)]# & 
+            comp_hits = compz[(compz['discrete_module_id'].isin(comp_mod)) & 
+                    (compz['r'] > hit2.r)]#& (compz['r'] != self.prev_hit_buffer.r)]# & 
 
         if len(comp_hits) ==0 : 
             print("mwhahha I went here loliz")
@@ -77,53 +77,58 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         #print("usin hit 2 as comp")
             self.done = True 
 
+
+        #if len(comp_hits) ==0 : 
+        #    print("hits the first")
+        #    comp_hits = self.hits[(self.hits['discrete_module_id'].isin(comp_mod)) & (self.hits['r'] > hit2.r)]
+
+         #   self.done = True 
+        #else: 
+        #    print("does not hit first")
+        #if len(comp_hits) == 0: 
+        #    comp_hits = self.hits[self.hits['r'] > hit2.r]
+
+
+        self.prev_hit_buffer = hit2
+
         return comp_hits 
     
     def _find_line_compatible_hits(self, m,b, comp_hits, num_close):
+
         distances = calc_distance(m,b, comp_hits.z, comp_hits.r)
 
-        #if num_close == 0: 
-        #    idx = np.argmin(distances)
-        #    one_hit = pd.DataFrame([comp_hits.iloc[idx]]) 
-        #    final = one_hit
-            #final = pd.concat([one_hit, one_hit])
-            #print(final)
-        #elif len(comp_hits) > num_close: 
-            #idx = np.argpartition(distances, num_close)
-            #final = comp_hits.iloc[idx][:num_close]
+        # this is probably very slow for many hits 
         final = comp_hits.iloc[distances.argsort()[:num_close]]
 
-        #else: 
-        #    final = comp_hits 
-        
-        #print(final)
-                              #prepare file to write output 
-        #print("lenght of comp hits is", len(final))
-        for i in range(len(final)):
-            comp_row = final.iloc[i]
-            row = pd.DataFrame({'particle_id': [self.hit.particle_id], 
-            'hit2_z': [self.hit.z],
-            'hit2_r': [self.hit.r],  
-            'm': [m],
-            'b' : [b],
-            'comp_hit_z': [comp_row.z], 
-            'comp_hit_r': [comp_row.r]})
-            row.to_csv(f, mode='a', header=None, index=None)
+        # for i in range(len(final)):
+        #     comp_row = final.iloc[i]
+        #     row = pd.DataFrame({'particle_id': [self.hit.particle_id], 
+        #     'hit2_z': [self.hit.z],
+        #     'hit2_r': [self.hit.r],  
+        #     'm': [m],
+        #     'b' : [b],
+        #     'comp_hit_z': [comp_row.z], 
+        #     'comp_hit_r': [comp_row.r]})
+        #     row.to_csv(f, mode='a', header=None, index=None)
             
         return final 
     
     def hit_df(self, hit): 
+        """Return the correct pandas row from the hit posistion"""
         hit_df = self.hits[(self.hits['z'] == hit[0]) & (self.hits['r'] == hit[1])]
         if hit_df.shape[0] != 1: 
-            print("the hit df is", hit_df)
             hit_df = hit_df.iloc[0] 
         return hit_df.squeeze() 
 
     def get_comp_hits(self, hit2, m, b, num_close): 
         #the state only includes the positions of the hits, get the full row 
-        self.prev_hit_buffer = hit2 
+        #self.prev_hit_buffer = hit2 
         mod_comp_hits = self._find_module_compatible_hits(hit2, m) 
+        # if (hit2.particle_id == 4.053265090839839e+17) & (hit2.hit_id == 10038.0): 
+        #     print("slope is ", m, mod_comp_hits.hit_id)
         comp_hits = self._find_line_compatible_hits(m, b, mod_comp_hits, num_close)
+        # randomly shuffle the hits! This is important, otherwise it learns to always select the closest one by having the same quality for all hits
+        comp_hits = comp_hits.sample(frac=1)
         self.prev_prev_buffer = hit2 
         return comp_hits, self.done 
 
@@ -139,4 +144,80 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         return self.hits 
 
 
+    def get_reward(self, hit2, correct_hit): 
+         
+        distance = np.sqrt((hit2.z-correct_hit.z)**2 + (hit2.r-correct_hit.r)**2)
+        # end_hit = particle.iloc[-1] 
+        reward = -distance
+    #     if hit2.hit_id == correct_hit.hit_id: 
+    #         reward = 10
+    #     # elif end_hit.hit_id == correct_hit.hit_id: 
+    #     #     reward = 0
+    #    # elif self.previous_state[1] == self.state[1]: 
+    #     #    reward = -5
+    #     else: 
+    #         reward = -distance
         
+        return reward 
+        
+
+    # def get_reward(self, hit2, hit3):
+    #     particle = self.hits[self.hits['particle_id'] == hit2.particle_id] 
+    #     particle = particle.groupby('unique_layer_id').min().reset_index()
+
+    #     op_wo_self = particle[particle['unique_layer_id']!=hit2.unique_layer_id]
+    #     end_track = False 
+    #     try: 
+    #         correct_hit = op_wo_self[(op_wo_self['r'] > hit2[1])].iloc[0]
+    #     except: 
+    #         correct_hit = hit2
+    #         end_track = True
+    #         done = True
+
+    #     distance = np.sqrt((hit3.z-correct_hit.z)**2 + (hit3.r-correct_hit.r)**2)
+        
+    #     if hit3.hit_id == correct_hit.hit_id: 
+    #         reward = 10
+    #     elif end_track: 
+    #         reward = 0
+    #    # elif self.previous_state[1] == self.state[1]: 
+    #     #    reward = -5
+    #     else: 
+    #         reward = -distance
+        
+    #     return reward 
+        
+
+    # def get_correct_hit(self, hit2): 
+    #     #particle = self.hits[self.hits['particle_id'] == hit2.particle_id] 
+    #     # takes the smaller of the double hit 
+        
+    #     #particle = particle.groupby('unique_layer_id').min().reset_index()
+    #     #correct_hit = particle.iloc[self.hit_counter]
+        
+        
+    #     op_wo_self = particle[particle['unique_layer_id']!=hit2.unique_layer_id]
+    #     op_wo_self= op_wo_self.sort_values(['r', 'z'])
+
+        
+    #     try: 
+    #         correct_hit = op_wo_self[(op_wo_self['r'] > hit2.r)].iloc[0]
+    #     except: 
+    #         correct_hit = hit2
+
+    #     #print("hit2", hit2[['z', 'r']], "\n particle", op_wo_self[['z', 'r']], "\n correct hit", correct_hit[['z',  'r']])
+        
+    #     return correct_hit
+
+    def set_current_pid(self, pid): 
+        self.current_pid = pid
+    
+    def set_counter(self, count): 
+        self.hit_counter = count 
+
+    def get_hit(self, hit_id): 
+        return self.hits[self.hits['hit_id']==hit_id]
+
+    def get_particle(self, pid): 
+        # for debugging purposes 
+        return self.hits[self.hits['particle_id']==pid]

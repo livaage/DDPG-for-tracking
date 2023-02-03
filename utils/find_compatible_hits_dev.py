@@ -126,9 +126,11 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         mod_comp_hits = self._find_module_compatible_hits(hit2, m) 
         # if (hit2.particle_id == 4.053265090839839e+17) & (hit2.hit_id == 10038.0): 
         #     print("slope is ", m, mod_comp_hits.hit_id)
-        comp_hits = self._find_line_compatible_hits(m, b, mod_comp_hits, num_close)
+        #comp_hits = self._find_line_compatible_hits(m, b, mod_comp_hits, num_close)
         # randomly shuffle the hits! This is important, otherwise it learns to always select the closest one by having the same quality for all hits
-        comp_hits = comp_hits.sample(frac=1)
+        comp_hits = mod_comp_hits.iloc[:num_close]
+        
+        #comp_hits = comp_hits.sample(frac=1)
         self.prev_prev_buffer = hit2 
         return comp_hits, self.done 
 
@@ -149,8 +151,8 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         distance = np.sqrt((hit2.z-correct_hit.z)**2 + (hit2.r-correct_hit.r)**2)
         # end_hit = particle.iloc[-1] 
         reward = -distance
-    #     if hit2.hit_id == correct_hit.hit_id: 
-    #         reward = 10
+        # if hit2.hit_id == correct_hit.hit_id: 
+        #     reward = 10
     #     # elif end_hit.hit_id == correct_hit.hit_id: 
     #     #     reward = 0
     #    # elif self.previous_state[1] == self.state[1]: 

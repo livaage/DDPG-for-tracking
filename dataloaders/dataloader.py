@@ -205,7 +205,7 @@ class DataLoader:
 
 
         #return self.all_hits, np.unique(self.hits['particle_id'])
-        #good_pids = self.hits.particle_id.unique()[2:3]
+        good_pids = self.hits.particle_id.unique()[:10]
         #removable_pids = [pid for pid in np.unique(self.all_hits.particle_id) if pid not in np.unique(self.hits.particle_id)]
 
         #pids_to_remove = removable_pids[:round(len(removable_pids)/2)]

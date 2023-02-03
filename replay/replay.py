@@ -6,6 +6,8 @@ from model.critic import get_critic
 import pandas as pd 
 from policy.policy_maxQ_1 import policy_maxQ
 from policy.get_comp_hits import get_comp_hits
+from utils.geometry import find_m_b_no_df
+import csv 
 
 tf.config.run_functions_eagerly(True)
 
@@ -19,12 +21,25 @@ lower_bound = config['lower_bound']
 num_close_hits = config['num_close_hits']
 critic_lr = 0.001
 #actor_lr = 0.001
-gamma = 0.99
+gamma = 0
 
 #clipvalue
 
-critic_optimizer = tf.keras.optimizers.Adam(critic_lr, amsgrad=True)
-#critic_optimizer = tf.keras.optimizers.RMSprop(critic_lr)
+#critic_optimizer = tf.keras.optimizers.Adam(critic_lr, amsgrad=True)
+critic_optimizer = tf.keras.optimizers.RMSprop( learning_rate=1e-4,
+    rho=0.9,
+    momentum=0.0,
+    epsilon=1e-07,
+    centered=False,
+    decay=0,
+    clipnorm=True,
+    clipvalue=True,
+    global_clipnorm=None,)
+
+f = open("evaluation/replay_check.csv", "w")
+writer = csv.writer(f)
+writer.writerow(["hit1_r", "hit2_r", "hit3_r", "qvals", "maxq"])
+
 
 
 #actor_optimizer = tf.keras.optimizers.Adam(actor_lr)
@@ -88,33 +103,75 @@ class Buffer:
         # See Pseudo Code.
         with tf.GradientTape() as tape:
 
-            q_vals_batches = []
-            next_comp_hits = np.zeros((len(state_batch), num_close_hits, 2)) 
-            for i in range(len(next_state_batch)): 
-                comp_hits_i, rewards, cor = get_comp_hits(next_state_batch[i], self.comp, correct_hit_batch[i])
-                next_comp_hits[i] =  comp_hits_i
+            # q_vals_batches = []
+            # next_comp_hits = np.zeros((len(state_batch), num_close_hits, 2)) 
+            # for i in range(len(next_state_batch)): 
+            #     comp_hits_i, rewards, cor = get_comp_hits(next_state_batch[i], self.comp, correct_hit_batch[i])
+            #     next_comp_hits[i] =  comp_hits_i
+
+            next_comp_hits =  np.zeros((comp_hits_batch.shape[0], comp_hits_batch.shape[1], num_close_hits, 2))
             
-            next_comp_hits = next_comp_hits.reshape(self.batch_size*num_close_hits, 2)
+            # for each starting hit 
+            max = []
+            for i in range(len(comp_hits_batch)): 
+                # for each of the compatible hits 
+                for j in range(len(comp_hits_batch[i])):
+                    #print("i'm in the buffer")
+                    m, b = find_m_b_no_df(state_batch[i], comp_hits_batch[i][j])
+                    potential_state = [comp_hits_batch[i][j][0], comp_hits_batch[i][j][1], m, b]
+                    #print("potential state", potential_state)
+                    # is that the right correct hit 
+                    # find the next correct hits for that starting point and its compatible hit - doens't matter 
+                    new_comp_hits, rewards, cor = get_comp_hits(potential_state, self.comp, correct_hit_batch[i])
+                    #next_comp_hits[i][j] =  new_comp_hits
+                    #print(new_comp_hits.shape)
+                    action, return_best_action, q_vals = policy_maxQ(potential_state, self.target_critic, new_comp_hits)
+
+                    max.append(tf.reduce_max(q_vals)) 
+
+                    #print("hit1 is", state_batch[i], "hit 2 is", comp_hits_batch[i][j], "hit 3s are", new_comp_hits, "qvals are", q_vals, "max", tf.reduce_max(q_vals))
+                    for k in range(len(new_comp_hits)): 
+                        row = pd.DataFrame({
+                        'hit1_r': [state_batch[i][1].numpy()],
+                        'hit2_r': [comp_hits_batch[i][j][1].numpy()],  
+                        'hit3_r': [new_comp_hits[k]], 
+                        'qvals': [q_vals[k]], 
+                        #'reward': [rewards[i]],
+                        #'quality': q_vals[i], 
+                        'maxq': [tf.reduce_max(q_vals).numpy()]})
+                        row.to_csv(f, mode='a', header=None, index=None)
+
+
+
+            max = tf.reshape(tf.stack(max), (self.batch_size, num_close_hits))
+            #print("!!!next comp hits" , next_comp_hits)
+            
+           # next_comp_hits = next_comp_hits.reshape(self.batch_size*num_close_hits*num_close_hits, 2)
             comp_hits_batch = tf.reshape(comp_hits_batch, (self.batch_size*num_close_hits, 2))
-            print(next_state_batch, next_comp_hits)
-            action, return_best_action, q_vals = policy_maxQ(next_state_batch, self.target_critic, next_comp_hits)
+            #print(next_state_batch, next_comp_hits)
+            #action, return_best_action, q_vals = policy_maxQ(next_state_batch, self.target_critic, next_comp_hits)
             #print(q_vals)
             #print(reward_batch) #tf.math.reduce_max(reward_batch, axis=1))
 
-            print("reward batch", reward_batch)
-            y = tf.reshape(reward_batch, self.batch_size*num_close_hits) + gamma * q_vals
+            #print("reward batch", reward_batch)
+            #y = tf.reshape(reward_batch, self.batch_size*num_close_hits) + gamma * q_vals
+            y = reward_batch + gamma*max
 
+            #print(y)
             comp_all_batch= np.tile(comp_hits_batch, (num_close_hits,1)).reshape((-1, num_close_hits, 2))
             input = [tf.convert_to_tensor(np.tile(state_batch, (num_close_hits, 1))), tf.convert_to_tensor(comp_hits_batch), tf.convert_to_tensor(comp_all_batch)]
             critic_value = self.critic_model(input, training=True)
- 
+            #print("input", input)
             critic_value = tf.squeeze(critic_value)
 
-            critic_loss = tf.math.reduce_mean(tf.math.abs(y - critic_value))
+            #print("y is ", y, "reward is ", reward_batch)
+            critic_loss = tf.math.reduce_mean(tf.math.square(tf.reshape(y, self.batch_size*num_close_hits) - critic_value))
+            #print(critic_loss)
         critic_grad = tape.gradient(critic_loss, self.critic_model.trainable_variables)
         critic_optimizer.apply_gradients(
             zip(critic_grad, self.critic_model.trainable_variables)
         )
+        return critic_loss 
 
     # We compute the loss and update parameters
     def learn(self):
@@ -133,8 +190,8 @@ class Buffer:
         comp_hits_batch = tf.convert_to_tensor(self.comp_hits_buffer[batch_indices])
         correct_hit_batch = tf.convert_to_tensor(self.correct_hit_buffer[batch_indices])
 
-        self.update(state_batch, action_batch, reward_batch, next_state_batch, comp_hits_batch, correct_hit_batch)
-
+        critic_loss = self.update(state_batch, action_batch, reward_batch, next_state_batch, comp_hits_batch, correct_hit_batch)
+        return critic_loss
 
 # This update target parameters slowly
 # Based on rate `tau`, which is much less than one.

@@ -62,4 +62,6 @@ def get_critic():
 #kernel_initializer=first_init
 
     model = tf.keras.Model([state_input, action_input], outputs)
+
+
     return model

@@ -68,13 +68,46 @@ class Find_Compatible_Hits_ModuleMap_Line:
 
     def get_comp_hits(self, hit1, hit2, num_close): 
         #the state only includes the positions of the hits, get the full row 
-        hit1 = self.hits[(self.hits['z'] == hit1[0]) & (self.hits['r'] == hit1[1])].squeeze()
-        hit2 = self.hits[(self.hits['z'] == hit2[0]) & (self.hits['r'] == hit2[1])].squeeze() 
-        if len(self.hits[(self.hits['z'] == hit2[0]) & (self.hits['r'] == hit2[1])]) > 0: 
-            hit2 = hit2.iloc[0]
+        #hit1 = self.hits[(self.hits['z'] == hit1[0]) & (self.hits['r'] == hit1[1])].squeeze()
+        #if len(hit1) > 1: 
+        #    hit1 = hit1.iloc[0]
+        #hit2 = self.hits[(self.hits['z'] == hit2[0]) & (self.hits['r'] == hit2[1])].squeeze() 
+        #if len(self.hits[(self.hits['z'] == hit2[0]) & (self.hits['r'] == hit2[1])]) > 0: 
+        #    hit2 = hit2.iloc[0]
 
+        hit1 = hit1.squeeze()
+        hit2 = hit2.squeeze()
         m, b = self._find_m_b(hit1, hit2) 
         mod_comp_hits = self._find_module_compatible_hits(hit1, hit2) 
         comp_hits = self._find_line_compatible_hits(m, b, mod_comp_hits, num_close)
         return comp_hits, self.done 
         
+
+    def hit_df(self, hit): 
+        """Return the correct pandas row from the hit posistion"""
+        hit_df = self.hits[(self.hits['z'] == hit[0]) & (self.hits['r'] == hit[1])]
+        if hit_df.shape[0] != 1: 
+            hit_df = hit_df.iloc[0] 
+        return hit_df.squeeze() 
+
+    
+    def get_hit(self, hit_id): 
+        return self.hits[self.hits['hit_id']==hit_id]
+
+    
+
+    def get_reward(self, hit2, correct_hit): 
+         
+        distance = np.sqrt((hit2.z-correct_hit.z)**2 + (hit2.r-correct_hit.r)**2)
+        # end_hit = particle.iloc[-1] 
+        reward = -distance
+        # if hit2.hit_id == correct_hit.hit_id: 
+        #     reward = 10
+    #     # elif end_hit.hit_id == correct_hit.hit_id: 
+    #     #     reward = 0
+    #    # elif self.previous_state[1] == self.state[1]: 
+    #     #    reward = -5
+    #     else: 
+    #         reward = -distance
+        
+        return reward 

@@ -2,12 +2,14 @@ import numpy as np
 import pandas as pd 
 import trackml.dataset 
 from sklearn import preprocessing
+from configs import BASEPATH, BASE_DIR
 
+#print("base dir is ", BASE_DIR)
 
-unique_layer_id_mapping = pd.read_csv('/home/lhv14/unique_layer_id_mapping.csv') 
-allowed_layer_connections = pd.read_csv('/home/lhv14/allowed_layer_connections.csv')
+unique_layer_id_mapping = pd.read_csv(BASE_DIR+'/utils/helperfiles/unique_layer_id_mapping.csv') 
+allowed_layer_connections = pd.read_csv(BASE_DIR+'/utils/helperfiles/allowed_layer_connections.csv')
 remap_modules_dic = ''
-with open(r'/home/lhv14/remap_modules.txt','r') as f:
+with open(BASE_DIR+'/utils/helperfiles/remap_modules.txt','r') as f:
          for i in f.readlines():
             remap_modules_dic=i #string
 remap_modules_dic = eval(remap_modules_dic) # this is orignal dict with instace dict
@@ -18,7 +20,7 @@ prefix = '/home/lhv14/exatrkx/Tracking-ML-Exa.TrkX/alldata/train_2/event00000'
 
 #cms stuff 
 
-allowed_layer_connections_cms = pd.read_csv('/home/lhv14/allowed_layer_connections_cms.csv')
+allowed_layer_connections_cms = pd.read_csv(BASE_DIR+'/utils/helperfiles/allowed_layer_connections_cms.csv')
 allowed_layer_connections_cms = allowed_layer_connections.rename(columns={'allowed_layer_id':'unique_layer_id'})
 
 remap = {1:4, 2:0, 3:16, 5:28, 4:34, 6:39}
@@ -72,7 +74,11 @@ class DataLoader:
 
         hits['discrete_module_id'] = [remap_modules_dic[val] for val in mods]
         hits = hits.merge(unique_layer_id_mapping, on=['volume_id', 'layer_id'], how='left')
-        hits = hits.groupby(['particle_id', 'unique_layer_id']).min().reset_index()
+        # removes two hits in one layer
+        #hits = hits.groupby(['particle_id', 'unique_layer_id']).min().reset_index()
+        s = hits.groupby('particle_id')['particle_id'].cumcount() 
+        hits['hit_number'] = s
+
 
         #hits = hits.merge(lids, on=['volume_id', 'layer_id'], how='left')
         hits = hits.sort_values(['r', 'z'])
@@ -99,17 +105,14 @@ class DataLoader:
         le.fit(background['sim_pt'].unique())
         background['particle_id'] = create_unique_label_background_tracks(background['particle_id'], background['sim_pt'])
         hits = tracks.append(background)
-        
+        s = hits.groupby('particle_id')['particle_id'].cumcount() 
+        hits['hit_number'] = s
         # make a copy to make sure we have all the hits before subsetting 
         all_hits = hits 
         
         #start subsetting the ones we want to train on 
         
         # tracks with at least seven hits 
-        c = hits.groupby(['particle_id']).count()
-        hits = hits[hits['particle_id'].isin(c[c['hit_id'] > 6].index)]
-
-
         
         # if a track has more than fifty hits, we don't want to train on it, likely very strange
         count = hits['particle_id'].value_counts()
@@ -133,6 +136,9 @@ class DataLoader:
 
         #z0 = hits.groubpy('particle_id')['z'].min() 
         
+        c = hits.groupby(['particle_id']).count()
+        hits = hits[hits['particle_id'].isin(c[c['hit_id'] > 8].index)]
+
 
         hits = hits.sort_values(['r', 'z'])
 
@@ -184,6 +190,15 @@ class DataLoader:
         f = right_particles.append(left_particles)
         return f
 
+    def _sub_volume(self): 
+        
+        allowed_volume_id = [8, 13, 17] 
+        g = self.hits.groupby(['particle_id', 'volume_id']).count().reset_index()
+
+        forbidden_pids = g[~g['volume_id'].isin(allowed_volume_id)].particle_id.unique()
+
+        self.hits = self.hits[~self.hits['particle_id'].isin(forbidden_pids)]
+
 
 
 
@@ -202,27 +217,35 @@ class DataLoader:
         self._pt_cut(2)
         self._sort() 
         #print(np.unique(self.hits['particle_id']))
+        #self._sub_volume() 
 
-
-        #return self.all_hits, np.unique(self.hits['particle_id'])
+        #return self.all_hits, np.unique(self.hits['particle_id'])10
         good_pids = self.hits.particle_id.unique()[:10]
+        
+        #print("goood pids", good_pids)
+        #good_pids = [5.719682852312842e+17] #, 3.2876593389397606e+17]
+        
+        #self.hits = self.hits[self.hits['particle_id'].isin(good_pids)]
+
         #removable_pids = [pid for pid in np.unique(self.all_hits.particle_id) if pid not in np.unique(self.hits.particle_id)]
 
         #pids_to_remove = removable_pids[:round(len(removable_pids)/2)]
         #self.all_hits = self.all_hits[~self.all_hits['particle_id'].isin(pids_to_remove)]
 
-        allowed = np.unique(self.hits.particle_id)
+        #allowed = np.unique(self.hits.particle_id)
         #self.hits = self.hits[self.hits['particle_id'].isin(good_pids)]
         #test_allowed_pids = allowed[:round(len(allowed)*0.001)]
-        test_allowed_pids = allowed[:2]
+        #test_allowed_pids = allowed[:2]
         #print(len( np.unique(self.hits.particle_id)))
         #self.all_hits = self.all_hits[self.all_hits['particle_id'].isin(test_allowed_pids)]
 
+
+        #self.all_hits = self.all_hits[self.all_hits['pt']>2]
         return self.all_hits, self.hits # [908] #new_allowed_pids 
 
     def load_data_cms(self, file_number): 
-        self._load_file_cms(file_number)
+        self._load_file_cms(file_number)   
 
 
 
-        return self.all_hits, np.unique(self.hits.particle_id)  # [908] #new_allowed_pids 
+        return self.all_hits, self.hits  # [908] #new_allowed_pids 

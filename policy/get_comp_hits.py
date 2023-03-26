@@ -6,21 +6,30 @@ import pandas as pd
 from utils.geometry import find_n_closest_hits  
 import yaml
 
+
 with open("/home/lhv14/GCRL/DDPG/config.yaml", "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
 num_close_hits = config['num_close_hits']
 
 
-
-def get_comp_hits(state, comp, correct_hit_id):
+#@numba.jit
+def get_comp_hits(state, comp, correct_hit_id, dope=False):
 
     """takes the current state and the actual correct hit for the next state """ 
 
     hit2_df = comp.hit_df(state[:2])
 
+    hit_number = hit2_df.hit_number 
+
+    # prev_two_hits = comp.hits.iloc[int(max([hit_number-2, 0])):int(hit_number)]
+    # print(prev_two_hits)
+
+    # if len(prev_two_hits) < 2: 
+    #     prev_two_hits = prev_two_hits.append(prev_two_hits.iloc[0])
 
     comp_hits, done = comp.get_comp_hits(hit2_df, state[2], state[3], num_close_hits) 
+    #comp_hits, done = comp.get_comp_hits(prev_hit, hit2_df, num_close_hits) 
     # need the format to be consistent 
     if len(comp_hits) < num_close_hits: 
         try: 
@@ -30,28 +39,36 @@ def get_comp_hits(state, comp, correct_hit_id):
         comp_hits = pd.concat([comp_hits, added_rows])
     comp_hits = comp_hits.reset_index() 
 
+    #print(comp_hits[['z', 'r', 'x', 'y']])
     cor = comp.get_hit(correct_hit_id).squeeze()
     #print("cor in get comp is ", cor[['z', 'r']])
-    comp_hits.loc[comp_hits.index[1]] = cor
+    #if including, remmeber to change from max to median for the next hit reward
+    if (dope) and (int(cor.hit_id) not in comp_hits.hit_id.values): 
+        #print(int(cor.hit_id), comp_hits.hit_id)
+        comp_hits.loc[comp_hits.index[num_close_hits-1]] = cor
     #print("comp hits in comp is", comp_hits[['z', 'r']])
     #cor instead 
-    random_choice = np.random.choice(2,1)
+    #random_choice = np.random.choice(len(comp_hits))
     # comp_hits = comp_hits.iloc[random_choice]
     # comp_hits = pd.concat([comp_hits, comp_hits])
     #print(comp_hits)
     
 
     #change? 
-    comp_hits = comp_hits.sort_values(['r', 'z'])
+    #comp_hits = comp_hits.sort_values(['r'])
+    #print("")
     
-    comp_hits_z_r = comp_hits[['z', 'r']].values
+    comp_hits = comp_hits.sample(frac=1)
+    comp_hits_z_r_x_y = comp_hits[['z', 'r', 'x', 'y']].values
     #print("in comp: \n", "the state:", state, "the comps ", comp_hits_z_r)
 
 
-    rewards = [comp.get_reward(comp_hits.iloc[i], cor) for i in range(len(comp_hits))]
-   
 
-    return comp_hits_z_r, rewards, cor.hit_id
+    #rewards = comp.get_rank_reward(comp_hits, cor)
+    #rewards = [comp.get_reward(comp_hits.iloc[i], cor) for i in range(len(comp_hits))]
 
+    rewards = comp.get_reward_binary(comp_hits, cor)
+    #print("hit2 is", hit2_df[['z', 'r']], "and the compy bois are ", comp_hits_z_r, "correct is", cor[['z', 'r']])
+    return comp_hits_z_r_x_y, rewards, cor.hit_id
 
 

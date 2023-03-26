@@ -10,6 +10,7 @@ def find_m_b(hit1, hit2):
     else: 
          m = 100
     b = hit2.r - m*hit2.z
+
     return m,b 
 
 
@@ -25,3 +26,7 @@ def find_n_closest_hits(point_z, point_r, hits, n):
     d = np.sqrt((point_z - hits.z)**2 + (point_r - hits.r)**2)
     closest_n_hits = hits.iloc[np.argsort(d)[:n]] 
     return closest_n_hits
+
+def normalise_data(data):
+    return (data - (-100)) / (10 - (-100))
+

@@ -1,22 +1,22 @@
 import pandas as pd
 import numpy as np 
 
-from utils.geometry import calc_distance 
+from utils.geometry import calc_distance, normalise_data 
 import json 
 import csv 
 
-#f = open("/home/lhv14/mapping_noMissing_noPtcut_1400.json")
-f = open("/home/lhv14/mapping_noMissing_noPtcut__noDoubles_1000.json") 
+f = open("utils/helperfiles/mapping_noMissing_noPtcut_1400.json")
+#f = open("utils/helperfiles/mapping_noMissing_noPtcut__noDoubles_1000.json") 
 # returns JSON object as 
 # a dictionary*
 mappings = json.load(f)
 
 
-f =  open("/home/lhv14/mapping_CMS_nocut_1000.json")
+f =  open("utils/helperfiles/mapping_CMS_nocut_1000.json")
 mappings_cms = json.load(f)
 
 
-f = open("/home/lhv14/DDPG/evaluation/comp_hits.csv", "w")
+f = open("evaluation/comp_hits.csv", "w")
 writer = csv.writer(f)
 writer.writerow(["particle_id", "hit2_z", "hit2_r", "m", "b", "comp_hit_z", "comp_hit_r"])
 
@@ -43,7 +43,7 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         # only allow z that's larger either positive or negative than previous z 
        
         
-        compz = self.hits[np.sign(m)*self.hits['z'] > np.sign(m)*(hit2.z + 0.01)]
+        compz = self.hits[np.sign(m)*self.hits['z'] > np.sign(m)*(hit2.z + 0.1)]
         #print("len 1", len(compz))
 
 
@@ -51,8 +51,9 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         #print("len 2", len(compz))
         # ensure it predicts from the nest layer and r is also bigger 
         comp_hits = compz[((compz['discrete_module_id'].isin(comp_mod)) & 
-                   (compz['r'] > (hit2.r +0.1))  & (compz['unique_layer_id']!=hit2.unique_layer_id))]# & 
+                   (compz['r'] > (hit2.r +1))  & (compz['unique_layer_id']!=hit2.unique_layer_id))]# & 
         #print("len 3", len(comp_hits))
+
 
         if len(comp_hits) == 0: 
             #print("htats right i went here")
@@ -95,6 +96,7 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
     
     def _find_line_compatible_hits(self, m,b, comp_hits, num_close):
 
+        #print("at line comp, comps are", comp_hits[['z', 'r']])
         distances = calc_distance(m,b, comp_hits.z, comp_hits.r)
 
         # this is probably very slow for many hits 
@@ -126,9 +128,12 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         mod_comp_hits = self._find_module_compatible_hits(hit2, m) 
         # if (hit2.particle_id == 4.053265090839839e+17) & (hit2.hit_id == 10038.0): 
         #     print("slope is ", m, mod_comp_hits.hit_id)
-        #comp_hits = self._find_line_compatible_hits(m, b, mod_comp_hits, num_close)
+        comp_hits = self._find_line_compatible_hits(m, b, mod_comp_hits, num_close)
+
+        #print(comp_hits)
         # randomly shuffle the hits! This is important, otherwise it learns to always select the closest one by having the same quality for all hits
-        comp_hits = mod_comp_hits.iloc[:num_close]
+        #comp_hits = comp_hits.sample(frac=1)
+        #comp_hits = mod_comp_hits.iloc[:num_close]
         
         #comp_hits = comp_hits.sample(frac=1)
         self.prev_prev_buffer = hit2 
@@ -151,8 +156,12 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
         distance = np.sqrt((hit2.z-correct_hit.z)**2 + (hit2.r-correct_hit.r)**2)
         # end_hit = particle.iloc[-1] 
         reward = -distance
-        # if hit2.hit_id == correct_hit.hit_id: 
+        #reward = -np.exp(distance)
+
+        # if hit2.r == correct_hit.r: 
         #     reward = 10
+        if hit2.hit_id == correct_hit.hit_id: 
+            reward = 10
     #     # elif end_hit.hit_id == correct_hit.hit_id: 
     #     #     reward = 0
     #    # elif self.previous_state[1] == self.state[1]: 
@@ -161,7 +170,26 @@ class Find_Compatible_Hits_ModuleMap_Line_New:
     #         reward = -distance
         
         return reward 
+
+    def get_reward_binary(self, comp_hits, correct_hit): 
+        comp_hits = comp_hits.reset_index() 
+        distances = np.sqrt((comp_hits.z-correct_hit.z)**2 + (comp_hits.r-correct_hit.r)**2)
+        rewards = np.zeros(len(distances))        
+        ix_right = comp_hits[comp_hits['hit_id'] == correct_hit.hit_id]
+        rewards[ix_right.index] = 1 
+        #print(comp_hits[['z', 'r']], correct_hit[['z', 'r']], rewards)
+        return rewards 
+
+
+    def get_rank_reward(self, comp_hits, correct_hit): 
         
+        distances = np.sqrt((comp_hits.z-correct_hit.z)**2 + (comp_hits.r-correct_hit.r)**2)
+        sorted = np.argsort(-distances.values)
+        sorted2 = np.argsort(sorted)
+        #print(distances.values, sorted)
+        #print(distances.values, sorted2)
+
+        return sorted2 
 
     # def get_reward(self, hit2, hit3):
     #     particle = self.hits[self.hits['particle_id'] == hit2.particle_id] 

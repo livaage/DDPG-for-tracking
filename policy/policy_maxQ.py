@@ -7,7 +7,7 @@ import pandas as pd
 from utils.geometry import find_n_closest_hits  
 import yaml
 
-with open("/home/lhv14/GCRL/DDPG/config.yaml", "r") as f:
+with open("config.yaml", "r") as f:
     config = yaml.load(f, Loader=yaml.FullLoader)
 
 num_close_hits = config['num_close_hits']

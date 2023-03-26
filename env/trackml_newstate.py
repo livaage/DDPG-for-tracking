@@ -19,6 +19,8 @@ import yaml
 
 from utils.geometry import find_m_b
 from utils.hits import find_df_hits
+from utils.helix import calc_p 
+
 
 f = open("evaluation/garage_outputs.csv", "w")
 writer = csv.writer(f)
@@ -64,7 +66,7 @@ class TrackMLState():
         self.allowed_pids = subset_hits['particle_id'].unique() 
         self.comp = comp
 
-    def reset(self):
+    def reset(self, file_counter):
         """Reset the environment.
 
         Returns:
@@ -85,6 +87,9 @@ class TrackMLState():
         #self.particle = self.event[self.event['particle_id']==first_particle_id]
         
         self.particle = self.subset_hits[self.subset_hits['particle_id']==random_particle_id]
+
+        #print(self.particle[['z', 'r', 'hit_number']])
+        
         #print("the particle is ", self.particle[['z', 'r', 'unique_layer_id', 'hit_id']])
         #print(self.event, random_particle_id)
         #print(self.particle)
@@ -103,18 +108,20 @@ class TrackMLState():
         #     self.num_track_hits = 2
 
         m, b = find_m_b(start_hit, next_hit)
-        self.dm = m 
+        self.original_m = m 
+        self.original_b = b
+        #self.dm = m 
         self.prev_three_layer_buffer[0] = start_hit.unique_layer_id
         self.prev_three_layer_buffer[1] = next_hit.unique_layer_id
         self.prev_three_layer_buffer[2] = next_hit.unique_layer_id
 
    
-        self._point = next_hit[['z', 'r']].values 
+        self._point = next_hit[['z', 'r', 'x', 'y']].values 
 
       
         self.max_r = next_hit.r
         #fix
-        self.file_counter = 0 
+        self.file_counter = file_counter
 
         #prepare file to write output 
         row = pd.DataFrame({'filenumber': [self.file_counter, self.file_counter], 
@@ -127,7 +134,13 @@ class TrackMLState():
         self.pt = self.start_hit.pt
 
 
-        self.state = [self._point[0], self._point[1], m, b]
+        # estimate pt based on three first hits --- CHANGE! uses one of the predicted hits truth level 
+        self.pt, self.px, self.py, self.pz = calc_p(self.particle.iloc[:3].x.values, self.particle.iloc[:3].y.values, self.particle.iloc[:3].z.values) 
+
+
+
+        #self.state = [self._point[0], self._point[1], start_hit.z, start_hit.r, m, b]
+        self.state = [self._point[0], self._point[1], m, b, self._point[2], self._point[3], self.px, self.py, self.pz]
         observation = self.state 
 
         self.previous_state = next_hit[['z', 'r']]
@@ -140,7 +153,7 @@ class TrackMLState():
         self.cor = self.correct_hit()
 
 
-        return observation, self.cor.hit_id
+        return observation, self.cor.hit_id, start_hit
 
     def step(self, action, cor, done):
         """Step the environment.
@@ -163,7 +176,7 @@ class TrackMLState():
             raise RuntimeError('reset() must be called before step()!')
         
         #action = action*1000
-        a = action.copy()  # NOTE: we MUST copy the action before modifying it
+        a = action.copy() # NOTE: we MUST copy the action before modifying it
 
 
 
@@ -184,17 +197,18 @@ class TrackMLState():
         # hit2_df = hit2_df.squeeze() 
    
         hit1_df = self.comp.hit_df(self.previous_state)
-        hit2_df = self.comp.hit_df(a)
+        hit2_df = self.comp.hit_df(a[:2])
         #print(hit1_df['z'].values == hit2_df['z'].values)
         m, b = find_m_b(hit1_df, hit2_df)
-
-        self.state = [a[0], a[1], m, b] 
-
+        # m = self.original_m
+        # b = self.original_b
+        #self.state = [a[0], a[1], self.previous_state[0], self.previous_state[1], m, b] 
+        self.state = [a[0], a[1], m, b, a[2], a[3],  self.px, self.py, self.pz] 
         correct_hit = self.cor
 
         #print("inside step the hit is ", a, "and the correct hit is ", correct_hit)        
         reward = self.comp.get_reward(hit2_df, correct_hit)
-
+    
 
         #print("in step the suggested hit is", a, "and correct hit is ", self.cor)
 
